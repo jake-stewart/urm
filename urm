@@ -1,0 +1,84 @@
+#!/bin/bash
+
+[ -z "$XDG_CACHE_HOME" ] && XDG_CACHE_HOME="$HOME/.cache"
+
+TRASH="$XDG_CACHE_HOME/urm"
+
+recursive=0
+force=0
+confirm=0
+verbose=0
+
+error() {
+    echo "urm: $1" >/dev/stderr
+}
+
+[ "$#" = 0 ] && echo "usage: urm [-rfv] file ..." \
+             && echo "       urm -u [-fv]"
+
+while getopts rfiuv opt; do
+    case "$opt" in
+        u) undo=1 ;;
+        r) recursive=1 ;;
+        f) force=1 ;;
+        i) confirm=1 ;;
+        v) verbose=1 ;;
+        *) exit 64 ;;
+    esac
+done
+
+while [ "${1:0:1}" = "-" ]; do
+    [ "$1" = "--" ] && shift && break
+    shift
+done
+
+if [ "$undo" = 1 ]; then
+    [ "$#" != 0 ] && error "-u must have 0 positional arguments" && exit 1
+    [ "$recursive" = 1 ] && error "-u cannot be applied with -r" && exit 1
+    [ ! -d "$TRASH" ] && error "nothing to undo" && exit 1
+
+    replaced=0
+    for file in "$(cd "$TRASH" && find . -type f | sed 's#^\./##')"; do
+        [ -e "/$file" ] && [ "$force" = 0 ] && \
+            error "'/$file' exists" && replaced=1
+    done
+    [ "$replaced" = 1 ] && exit 1
+
+    (cd "$TRASH"; find . -mindepth 1 -type d | sed 's#^\./##') \
+        | while read dir; do
+            [ "$verbose" = 1 ] && error "/$dir"
+            mkdir -p -- "/$dir"
+        done
+    (cd "$TRASH"; find . -type f | sed 's#^\./##') \
+        | while read file; do
+            [ "$verbose" = 1 ] && echo "/$file"
+            mv -- "$TRASH/$file" "/$file"
+        done
+    rm -rf -- "$TRASH"
+else
+    pwd="$(realpath -- $(pwd -P))/"
+    error=0
+    for file in "$@"; do
+        if [ ! -e "$file" ]; then
+            error "'$file': not found"
+            error=1
+        elif [[ "$pwd" == "$(realpath -- "$file")/"* ]]; then
+            error "\".\" and \"..\" may not be removed"
+            error=1
+        elif [ "$recursive" = 0 ] && [ -d "$file" ]; then
+            error "'$file': is a directory"
+            error=1
+        fi
+    done
+    [ "$error" = 1 ] && exit 1
+
+    [ -e "$TRASH" ] && rm -rf -- "$TRASH"
+    mkdir -p -- "$TRASH"
+
+    for file in "$@"; do
+        [ "$verbose" = 1 ] && echo "$file"
+        dest="$TRASH$(realpath -- "$file")"
+        mkdir -p -- "$(dirname -- "$dest")"
+        mv -- "$file" "$dest"
+    done
+fi
