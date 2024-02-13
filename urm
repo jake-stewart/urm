@@ -44,16 +44,18 @@ if [ "$undo" = 1 ]; then
     done
     [ "$replaced" = 1 ] && exit 1
 
-    (cd "$TRASH"; find . -mindepth 1 -type d | sed 's#^\./##') \
+    cd "$TRASH"
+    find . -mindepth 1 -type d | sed 's#^\./##' \
         | while read dir; do
             [ "$verbose" = 1 ] && error "/$dir"
             mkdir -p -- "/$dir"
         done
-    (cd "$TRASH"; find . -type f | sed 's#^\./##') \
+    find . -type f | sed 's#^\./##' \
         | while read file; do
             [ "$verbose" = 1 ] && echo "/$file"
             mv -- "$TRASH/$file" "/$file"
         done
+    cd -
     rm -rf -- "$TRASH"
 else
     pwd="$(realpath -- $(pwd -P))/"
