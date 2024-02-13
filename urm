@@ -55,7 +55,7 @@ if [ "$undo" = 1 ]; then
             [ "$verbose" = 1 ] && echo "/$file"
             mv -- "$TRASH/$file" "/$file"
         done
-    cd -
+    cd - >/dev/null
     rm -rf -- "$TRASH"
 else
     pwd="$(realpath -- $(pwd -P))/"
