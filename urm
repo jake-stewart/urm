@@ -37,12 +37,13 @@ if [ "$undo" = 1 ]; then
     [ "$recursive" = 1 ] && error "-u cannot be applied with -r" && exit 1
     [ ! -d "$TRASH" ] && error "nothing to undo" && exit 1
 
-    replaced=0
-    for file in "$(cd "$TRASH" && find . -type f | sed 's#^\./##')"; do
-        [ -e "/$file" ] && [ "$force" = 0 ] && \
-            error "'/$file' exists" && replaced=1
-    done
-    [ "$replaced" = 1 ] && exit 1
+    if [ "$force" = 0 ]; then
+        replaced=0
+        for file in "$(cd "$TRASH" && find . -type f -or -type l | sed 's#^\./##')"; do
+            [ -e "/$file" ] && error "'/$file' exists" && replaced=1
+        done
+        [ "$replaced" = 1 ] && exit 1
+    fi
 
     cd "$TRASH"
     find . -mindepth 1 -type d | sed 's#^\./##' \
@@ -50,7 +51,7 @@ if [ "$undo" = 1 ]; then
             [ "$verbose" = 1 ] && error "/$dir"
             mkdir -p -- "/$dir"
         done
-    find . -type f | sed 's#^\./##' \
+    find . -type f -or -type l | sed 's#^\./##' \
         | while read file; do
             [ "$verbose" = 1 ] && echo "/$file"
             mv -- "$TRASH/$file" "/$file"
@@ -67,7 +68,7 @@ else
         elif [[ "$pwd" == "$(realpath -- "$file")/"* ]]; then
             error "\".\" and \"..\" may not be removed"
             error=1
-        elif [ "$recursive" = 0 ] && [ -d "$file" ]; then
+        elif [ "$recursive" = 0 ] && [ -d "$file" ] && [ ! -L "$file" ]; then
             error "'$file': is a directory"
             error=1
         fi
@@ -79,8 +80,8 @@ else
 
     for file in "$@"; do
         [ "$verbose" = 1 ] && echo "$file"
-        dest="$TRASH$(realpath -- "$file")"
-        mkdir -p -- "$(dirname -- "$dest")"
-        mv -- "$file" "$dest"
+        dest="$TRASH$(realpath -- $(dirname -- "$file"))"
+        mkdir -p -- "$dest"
+        mv -- "$file" "$dest/$(basename "$file")"
     done
 fi
